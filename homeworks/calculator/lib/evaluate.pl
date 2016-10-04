@@ -20,9 +20,30 @@ no warnings 'experimental';
 sub evaluate {
 	my $rpn = shift;
 
-	# ...
+	my @buffer;
+	my $op;
+	for (@{ $rpn }) {
+		given ($_) {
+			when(/\d/) { push @buffer, $_; }
+			when(/U([\-])/) {
+				$buffer[$#buffer] *= -1;
+			}
+			when(/(^[*+\-\/\^])/) {
+				my $arg2 = pop @buffer;
+				my $arg1 = pop @buffer;
+				if ($1 eq '^') {
+					$op = '**';
+				}
+				else {
+					$op = $1;
+				}
+				push @buffer, eval "$arg1 $op $arg2";
+				die $@ if $@;
+			}
+		}	
+	}	
 
-	return 0;
+	return pop @buffer;
 }
 
 1;

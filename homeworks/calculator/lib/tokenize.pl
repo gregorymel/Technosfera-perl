@@ -28,8 +28,69 @@ no warnings 'experimental';
 sub tokenize {
 	chomp(my $expr = shift);
 	my @res;
+	
+	my $prev = '+';
+	for ($expr) {
+		pos = 0;
 
-	# ...
+		while (pos($_) < length) {
+			given ($_) {
+				when(/\G\s+/gc) {}
+
+				when(/\G([+-])/gc) {
+					my $sign = $1;
+					if ($prev =~ /^[+\-*\^\/(]/) {
+						push @res, "U".$sign; 
+						$prev = $sign;
+					}
+					else {
+						push @res, $sign;
+						$prev = $sign;
+					}
+				}
+
+				when(/\G(\d+(\.\d*)?|\.\d+)/gc) {
+					die "incorrect sequence" if $prev =~ /\d/;
+					my $mantissa = $1;
+					if (/\G(e[+-]?\d+)/gc) {
+						push @res, $mantissa.$1;
+						$prev = $mantissa.$1; 	
+					}
+					else {
+						push @res, $mantissa;
+						$prev = $mantissa;	
+					}
+				}
+
+				when(/\G([*\^\/])/gc) {
+					my $bop = $1;
+					if ($prev =~ /[*\^\/+\-(]$/) {
+						die "incorrect sequence";
+					}
+					push @res, $bop;
+					$prev = $bop;
+				}
+				
+				when(/\G([()])/gc) {
+					my $bracket = $1;
+					if ($bracket eq ')') {
+						die "incorrect sequence" unless $prev =~ /\d|\)/;
+					}
+					else {
+						die "incorrect sequence" if $prev =~ /\d/;
+					}
+					push @res, $bracket;
+					$prev = $bracket;					
+				}
+
+				default {
+					die "unidentified symbol"; 
+				}		
+			}
+		}
+	}
+
+	die "incorrect sequence" unless $prev =~ /\d|\)/; 
 
 	return \@res;
 }
