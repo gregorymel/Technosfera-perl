@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 8;
+use Test::More tests => 11;
 
 sub test_bin {
     my ($name, $params, $input, $output) = @_;
@@ -152,5 +152,59 @@ test_bin
 INPUT
 ,
 <<OUTPUT
+OUTPUT
+;
+
+test_bin
+'with spaces', q{--band ' A  B '},
+<<INPUT
+./ A  B /1 - A/m.mp3
+./ A B /1 - A/m.mp3
+./A  B/1 - A/m.mp3
+./A  B /1 - A/m.mp3
+./ A  B/1 - A/m.mp3
+INPUT
+,
+<<OUTPUT
+/--------------------------\\
+|  A  B  | 1 | A | m | mp3 |
+\\--------------------------/
+OUTPUT
+;
+
+test_bin
+'with dashes', q{--band '--A-B--C--'},
+<<INPUT
+./ABC/1 - A/m.mp3
+./--A-B--C--/1 - A/m.mp3
+./-A-B-C-/1 - A/m.mp3
+./--ABC--/1 - A/m.mp3
+./-AB-C-/1 - A/m.mp3
+INPUT
+,
+<<OUTPUT
+/------------------------------\\
+| --A-B--C-- | 1 | A | m | mp3 |
+\\------------------------------/
+OUTPUT
+;
+
+test_bin
+'several filters', '--band B --year 12',
+<<INPUT
+./B/1 - A/m.mp3
+./A/12 - B/t.flac
+./B/012 - AB/s.ogg
+./B/12 - B/o.ogg
+./A/12 - A/A.A
+./B/3 - C/a.abc
+INPUT
+,
+<<OUTPUT
+/------------------------\\
+| B | 012 | AB | s | ogg |
+|---+-----+----+---+-----|
+| B |  12 |  B | o | ogg |
+\\------------------------/
 OUTPUT
 ;

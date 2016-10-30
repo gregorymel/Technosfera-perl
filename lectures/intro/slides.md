@@ -898,8 +898,8 @@ Linux.
 - для GenToo: emerge dev-lang/perl
 - для FreeBSD: pkg install perl5
 
-Для любителей компилировать вёс под свою систему:
-- make perl ./Configure -des; make test instal
+Для любителей компилировать всё под свою систему:
+- make perl ./Configure -des; make test install
 
 ---
 
