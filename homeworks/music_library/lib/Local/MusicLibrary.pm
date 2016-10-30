@@ -14,18 +14,14 @@ use Getopt::Long qw(GetOptions);
 use Pod::Usage qw(pod2usage);
 ###############################
 
-use DDP;
-
 our $VERSION = '1.00';
 
 ##########################################
-use enum qw/BAND YEAR ALBUM TRACK FORMAT/;
-
 sub parse_input_data {
 	my $input_data = shift;
 
 	my @data_base;
-	for ($$input_data) {
+	for (@$input_data) {
 		if ( m{
 			^
 				\. /
@@ -40,11 +36,8 @@ sub parse_input_data {
 				(?<format>[^\.]+)
 			$
 		}x ) {
-			$data_base[BAND] = $+{band};
-			$data_base[YEAR] = $+{year};
-			$data_base[ALBUM] = $+{album};
-			$data_base[TRACK] = $+{track};
-			$data_base[FORMAT] = $+{format};
+			my %data_row = %+;
+			push @data_base, \%data_row;
 		}
 		else {
 			die "Incorrect sequence!";
@@ -58,11 +51,11 @@ sub sort_by_param($$) {
 	my ($param, $data_base) = @_;
 
 	my @sorted_data;
-	if ($param == YEAR) { 
-		@sorted_data = sort { $a->[YEAR] <=> $b->[YEAR] } @$data_base;
+	if ($param =~ /\d+/) { 
+		@sorted_data = sort { $a->{$param} <=> $b->{$param} } @$data_base;
 	}
 	else {
-		@sorted_data = sort { $a->[$param] cmp $b->[$param] } @$data_base;	
+		@sorted_data = sort { $a->{$param} cmp $b->{$param} } @$data_base;	
 	}
 	
 	return \@sorted_data;
@@ -72,89 +65,33 @@ sub filter_by_param {
 	my ($param, $name, $data_base) = @_;
 	
 	my @filtered_data;
-	if ($param == YEAR) {
-		@filtered_data = grep { $_->[YEAR] == $$name } @$data_base;
+	if ($param =~ /\d+/) {
+		@filtered_data = grep { $_->{$param} == $$name } @$data_base;
 	}
 	else {
-		@filtered_data = grep { $_->[$param] eq $$name } @$data_base;
+		@filtered_data = grep { $_->{$param} eq $$name } @$data_base;
 	}
 
 	return \@filtered_data;
 }
 
+sub choose_columns {
+	my $column_types = shift;
 
-sub formated_print {
-	my $data_base = shift @_;
-	
-	return [] unless @$data_base;
-
-	my @column_width;
-	for my $param (@_) {
-		my $max = length $$data_base[0][$param];
-		for my $row (@$data_base) {
-			$max = length $row->[$param] if $max < length $row->[$param];
-		}
-		push @column_width, $max;
-	}
-	
-	#Calculate width of table
-	my $width = 0;
-	for (@column_width) {
-		$width += ($_ + 2);
-	}
-	return if $width == 0;
-	$width += (@column_width - 1); 
-	#########################
-
-	printf "\/%s\\\n", "-" x $width;
-
-	my $col_count = 0; # column counter
-	my $row_count = 0; # row counter
-	for my $row (@$data_base) {
-
-		print "|";
-		$col_count = 0;
-		for my $param (@_) {
-			printf " %*s |", $column_width[$col_count], $row->[$param];
-			$col_count++; 	
-		}
-		print "\n";
-
-		do {
-			print "|";
-			$col_count = 0;
-			for my $param (@_) {
-				printf "-%s-", "-" x $column_width[$col_count];
-				print "+" unless $col_count == $#column_width;
-				$col_count++; 	
-			}
-			print "|";
-			print "\n";
-		} unless $row_count == $#$data_base;
-		$row_count++; 			
+	my @column_types =  split ',', $column_types;
+	for (@column_types) {
+		pod2usage(2) unless /album/
+						 || /track/
+						 || /format/
+						 || /band/
+						 || /year/;
 	}
 
-	printf "\\%s\/\n", "-" x $width;	
-}
-
-
-sub get_param_id {
-	my $param_str = shift;
-
-	my $param_id;
-	given ( $param_str ) {
-		when(/year/i)   { $param_id = YEAR };
-		when(/album/i)  { $param_id = ALBUM };
-		when(/format/i) { $param_id = FORMAT };
-		when(/band/i)   { $param_id = BAND };
-		when(/track/i)  { $param_id = TRACK };
-		default         { $param_id = undef }; 
-	}
-
-	return $param_id;
+	return \@column_types;
 }
 
 sub read_input_data {
+	my ($file) = @_;
 
 	my $param = {};	
 	GetOptions($param, 'help|?', "album=s", "track=s", "sort=s",
@@ -164,45 +101,35 @@ sub read_input_data {
 	pod2usage(1) if $param->{help};
 
 
-	my @data_base;
-	while (<>) {
+	my @input_data;
+	while (<$file>) {
 		chomp( $_ );
-		push @data_base, parse_input_data(\$_);
+		push @input_data, $_;
 	}
 
+	my @data_base = @{ parse_input_data(\@input_data) };
 
-	my $processed_data = \@data_base;
-	for (keys %$param) {
-		next if (/columns/);		
-
-		my $param_id;
-		if (/sort/) {
-			$param_id = get_param_id($param->{$_}); 
-			pod2usage(2) unless defined( $param_id );		
-			$processed_data = sort_by_param($param_id, $processed_data);
-		}
-		else {
-			$param_id = get_param_id($_); 		
-			$processed_data = filter_by_param($param_id, \$param->{$_}, $processed_data);
-		}
-	}
-
-
-	@_ = ($processed_data);
+	my @columns_for_print;
 	if (exists $param->{columns}) {
-		my @column_param = split ',', $param->{columns};
-		for (@column_param) {
-			my $param_id = get_param_id($_);
-			pod2usage(2) unless defined( $param_id );
-			push @_, $param_id if defined $param_id;
-		}
+		@columns_for_print = choose_columns(\@data_base);
 	}
 	else {
-		push @_, (BAND, YEAR, ALBUM, TRACK, FORMAT);
+		push @columns_for_print, qw(band year album track format);
 	}
+	delete $param->{columns};
 
-	goto &formated_print;
+	my $processed_data = \@data_base; 	
+	$processed_data = sort_by_param($param->{sort}, $processed_data)
+		if exists $param->{sort};
+	delete $param->{sort};
+
+	for (keys %$param) {
+		$processed_data = filter_by_param($_, \$param->{$_}, $processed_data);
+	}	
+
+	return ($processed_data, \@columns_for_print);
 }
+
 
 1;
 
