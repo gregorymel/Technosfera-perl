@@ -51,7 +51,7 @@ sub sort_by_param($$) {
 	my ($param, $data_base) = @_;
 
 	my @sorted_data;
-	if ($param =~ /\d+/) { 
+	if ($param eq "year") {
 		@sorted_data = sort { $a->{$param} <=> $b->{$param} } @$data_base;
 	}
 	else {
@@ -65,7 +65,7 @@ sub filter_by_param {
 	my ($param, $name, $data_base) = @_;
 	
 	my @filtered_data;
-	if ($param =~ /\d+/) {
+	if ($param eq "year") {
 		@filtered_data = grep { $_->{$param} == $$name } @$data_base;
 	}
 	else {
@@ -109,12 +109,12 @@ sub read_input_data {
 
 	my @data_base = @{ parse_input_data(\@input_data) };
 
-	my @columns_for_print;
+	my $columns_for_print;
 	if (exists $param->{columns}) {
-		@columns_for_print = choose_columns(\@data_base);
+		$columns_for_print = choose_columns($param->{columns});
 	}
 	else {
-		push @columns_for_print, qw(band year album track format);
+		$columns_for_print = [qw(band year album track format)];
 	}
 	delete $param->{columns};
 
@@ -127,7 +127,7 @@ sub read_input_data {
 		$processed_data = filter_by_param($_, \$param->{$_}, $processed_data);
 	}	
 
-	return ($processed_data, \@columns_for_print);
+	return ($processed_data, $columns_for_print);
 }
 
 
